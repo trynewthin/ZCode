@@ -1,0 +1,61 @@
+name: Build macOS
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/macos-build.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-macos-arm64:
+    name: macOS arm64
+    runs-on: macos-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.14.0"
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.33.2 --activate
+          node --version
+          pnpm --version
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build macOS arm64 package
+        env:
+          ZCODE_ENABLE_MAC_SIGN: "0"
+        run: pnpm bundle:desktop -- --os mac --arch arm64
+
+      - name: Show build outputs
+        if: always()
+        run: |
+          echo "Desktop dist:"
+          find packages/desktop/dist -maxdepth 2 -type f -print 2>/dev/null || true
+
+      - name: Upload macOS package
+        uses: actions/upload-artifact@v4
+        with:
+          name: zcode-macos-arm64
+          path: |
+            packages/desktop/dist/*.dmg
+            packages/desktop/dist/*.zip
+            packages/desktop/dist/*.yml
+            packages/desktop/dist/*.blockmap
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
